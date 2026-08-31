@@ -211,16 +211,33 @@ function resultHTML(){
   } else if(state.leaderboardLoading){
     boardHTML = `<div class="center-note"><div class="spinner"></div><div style="margin-top:10px;">ランキング集計中…</div></div>`;
   } else if(state.leaderboard){
-    const rows = state.leaderboard.slice(0,10).map((e,idx)=>`
+    const list = state.leaderboard;
+    const rows = list.slice(0,10).map((e,idx)=>`
       <tr class="${e.name===state.name ? "me":""}">
         <td class="rank">${idx+1}</td>
         <td>${escapeHtml(e.name)}</td>
         <td class="pct">${Math.round((e.score/e.total)*100)}%</td>
       </tr>
     `).join("");
+    const avgPct = list.length
+      ? Math.round(list.reduce((sum,e)=>sum+(e.score/e.total)*100,0) / list.length)
+      : null;
+    const avgScore = list.length
+      ? (list.reduce((sum,e)=>sum+Number(e.score),0) / list.length)
+      : null;
+    const avgHTML = avgPct===null ? "" : `
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line);">
+        <div style="font-size:12.5px; color:var(--muted);">みんなの平均(${list.length}人)</div>
+        <div style="text-align:right;">
+          <span style="font-size:22px; font-weight:900; color:var(--accent);">${avgScore.toFixed(1)}問</span>
+          <span style="font-size:12.5px; color:var(--muted); margin-left:4px;">(正解率${avgPct}%)</span>
+        </div>
+      </div>
+    `;
     boardHTML = `
       <div class="card">
         <div style="font-weight:700; font-size:13.5px; margin-bottom:10px;">みんなの正解率 TOP10</div>
+        ${avgHTML}
         <table class="board"><thead><tr><th></th><th>名前</th><th style="text-align:right;">正解率</th></tr></thead><tbody>${rows}</tbody></table>
       </div>
     `;
