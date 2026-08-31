@@ -234,12 +234,53 @@ function resultHTML(){
         </div>
       </div>
     `;
+    // 正解率の分布(100%以下/80%以下/60%以下/40%以下/20%以下)を円グラフで
+    const buckets = [
+      { label: "81〜100%", min: 80.0001, max: 100.0001, color: "#4f46e5" },
+      { label: "61〜80%",  min: 60.0001, max: 80.0001,  color: "#16a34a" },
+      { label: "41〜60%",  min: 40.0001, max: 60.0001,  color: "#f59e0b" },
+      { label: "21〜40%",  min: 20.0001, max: 40.0001,  color: "#f97316" },
+      { label: "0〜20%",   min: -0.0001, max: 20.0001,  color: "#dc2626" },
+    ];
+    buckets.forEach(b => b.count = 0);
+    list.forEach(e => {
+      const p = (e.score / e.total) * 100;
+      const b = buckets.find(b => p > b.min && p <= b.max) || buckets[buckets.length-1];
+      b.count++;
+    });
+    let distHTML = "";
+    if(list.length){
+      let acc = 0;
+      const stops = buckets.filter(b=>b.count>0).map(b=>{
+        const start = acc / list.length * 360;
+        acc += b.count;
+        const end = acc / list.length * 360;
+        return `${b.color} ${start}deg ${end}deg`;
+      }).join(", ");
+      const legendHTML = buckets.filter(b=>b.count>0).map(b=>`
+        <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:6px;">
+          <span style="width:10px; height:10px; border-radius:50%; background:${b.color}; display:inline-block; flex-shrink:0;"></span>
+          <span style="color:var(--text);">${b.label}</span>
+          <span style="color:var(--muted); margin-left:auto;">${b.count}人</span>
+        </div>
+      `).join("");
+      distHTML = `
+        <div class="card">
+          <div style="font-weight:700; font-size:13.5px; margin-bottom:14px;">正解率の分布</div>
+          <div style="display:flex; align-items:center; gap:20px;">
+            <div style="width:120px; height:120px; border-radius:50%; background:conic-gradient(${stops}); flex-shrink:0;"></div>
+            <div style="flex:1;">${legendHTML}</div>
+          </div>
+        </div>
+      `;
+    }
     boardHTML = `
       <div class="card">
         <div style="font-weight:700; font-size:13.5px; margin-bottom:10px;">みんなの正解率 TOP10</div>
         ${avgHTML}
         <table class="board"><thead><tr><th></th><th>名前</th><th style="text-align:right;">正解率</th></tr></thead><tbody>${rows}</tbody></table>
       </div>
+      ${distHTML}
     `;
   }
 
