@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>見破れクイズ 管理ページ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fbfbfa; --surface:#ffffff; --surface-alt:#f1f1f4; --line: rgba(20,20,30,0.10);
+    --accent:#4f46e5; --accent-ink:#ffffff; --correct:#16a34a; --incorrect:#dc2626;
+    --text:#15161d; --muted:#6b7280; --radius: 14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0; overflow-anchor:none;}
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, rgba(79,70,229,0.05), transparent 45%),
+      radial-gradient(circle at 100% 100%, rgba(22,163,74,0.04), transparent 40%),
+      var(--bg);
+    color:var(--text); font-family:"Noto Sans JP", sans-serif; min-height:100vh; min-height:100dvh; -webkit-font-smoothing:antialiased;
+  }
+  .display{font-family:"Zen Kaku Gothic New", sans-serif; font-weight:900;}
+  #app{ max-width:560px; margin:0 auto; min-height:100vh; min-height:100dvh; padding:32px 20px 60px; padding-top:max(32px, env(safe-area-inset-top)); position:relative; }
+  .eyebrow{ display:inline-block; font-size:12.5px; color:var(--accent); background:rgba(79,70,229,0.10);
+    border:1px solid rgba(79,70,229,0.30); padding:5px 12px; border-radius:100px; margin-bottom:14px; font-weight:700; letter-spacing:0.02em; }
+  h1.title{ font-size:26px; line-height:1.35; margin:0 0 6px; }
+  p.lede{ color:var(--muted); font-size:14px; line-height:1.7; margin:0 0 24px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px; margin-bottom:16px; }
+  table.board{width:100%; border-collapse:collapse; font-size:14px;}
+  table.board th{text-align:left; color:var(--muted); font-weight:500; font-size:12px; padding:0 8px 8px; border-bottom:1px solid var(--line);}
+  table.board td{padding:10px 8px; border-bottom:1px solid var(--line);}
+  table.board td.rank{color:var(--muted); width:28px;}
+  table.board td.pct{text-align:right; font-variant-numeric:tabular-nums; color:var(--accent); font-weight:700;}
+  .spinner{ width:22px; height:22px; border-radius:50%; border:3px solid var(--surface-alt); border-top-color:var(--accent);
+    animation:spin 0.7s linear infinite; margin:0 auto; }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .center-note{text-align:center; color:var(--muted); font-size:13.5px; padding:24px 0;}
+  .refresh-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .refresh-btn{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 14px;
+    font-family:"Noto Sans JP", sans-serif; font-size:13px; font-weight:700; color:var(--text); cursor:pointer; }
+  .refresh-btn:active{ transform:scale(0.97); }
+  .updated-at{ font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ====== ここだけ書き換える(クイズ本体と同じ値をコピー) ====== */
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR2gDQ7ULQajyaIjvABQ9EqaNeD_nGz4JgJHIcmH_5Bq4FAFo5QaaXDju5PruEv3yWSuGTJVv831zpW/pub?output=csv";
+const AUTO_REFRESH_SEC = 15; // 自動更新の間隔(秒)。0にすると自動更新しません
+/* ============================================ */
+
+const app = document.getElementById("app");
+let state = { loading: true, entries: null, updatedAt: null, error: false };
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function render(){
+  let bodyHTML = "";
+
+  if(state.loading && !state.entries){
+    bodyHTML = `<div class="center-note"><div class="spinner"></div><div style="margin-top:10px;">集計中…</div></div>`;
+  } else if(state.error && !state.entries){
+    bodyHTML = `<div class="center-note">データを取得できませんでした。SHEET_CSV_URL の設定を確認してください。</div>`;
+  } else {
+    const list = state.entries || [];
+
+    // 平均
+    const avgPct = list.length ? Math.round(list.reduce((s,e)=>s+(e.score/e.total)*100,0) / list.length) : null;
+    const avgScore = list.length ? (list.reduce((s,e)=>s+Number(e.score),0) / list.length) : null;
+    const avgHTML = avgPct===null ? "" : `
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line);">
+        <div style="font-size:12.5px; color:var(--muted);">みんなの平均(${list.length}人)</div>
+        <div style="text-align:right;">
+          <span style="font-size:26px; font-weight:900; color:var(--accent);">${avgScore.toFixed(1)}問</span>
+          <span style="font-size:12.5px; color:var(--muted); margin-left:4px;">(正解率${avgPct}%)</span>
+        </div>
+      </div>
+    `;
+
+    // TOP10
+    const rows = list.slice(0,10).map((e,idx)=>`
+      <tr>
+        <td class="rank">${idx+1}</td>
+        <td>${escapeHtml(e.name)}</td>
+        <td class="pct">${Math.round((e.score/e.total)*100)}%</td>
+      </tr>
+    `).join("");
+
+    // 分布(円グラフ)
+    const buckets = [
+      { label: "81〜100%", min: 80.0001, max: 100.0001, color: "#4f46e5" },
+      { label: "61〜80%",  min: 60.0001, max: 80.0001,  color: "#16a34a" },
+      { label: "41〜60%",  min: 40.0001, max: 60.0001,  color: "#f59e0b" },
+      { label: "21〜40%",  min: 20.0001, max: 40.0001,  color: "#f97316" },
+      { label: "0〜20%",   min: -0.0001, max: 20.0001,  color: "#dc2626" },
+    ];
+    buckets.forEach(b => b.count = 0);
+    list.forEach(e => {
+      const p = (e.score / e.total) * 100;
+      const b = buckets.find(b => p > b.min && p <= b.max) || buckets[buckets.length-1];
+      b.count++;
+    });
+    let distHTML = `<div class="center-note">まだ回答がありません</div>`;
+    if(list.length){
+      let acc = 0;
+      const stops = buckets.filter(b=>b.count>0).map(b=>{
+        const start = acc / list.length * 360;
+        acc += b.count;
+        const end = acc / list.length * 360;
+        return `${b.color} ${start}deg ${end}deg`;
+      }).join(", ");
+      const legendHTML = buckets.filter(b=>b.count>0).map(b=>`
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:8px;">
+          <span style="width:11px; height:11px; border-radius:50%; background:${b.color}; display:inline-block; flex-shrink:0;"></span>
+          <span style="color:var(--text);">${b.label}</span>
+          <span style="color:var(--muted); margin-left:auto;">${b.count}人</span>
+        </div>
+      `).join("");
+      distHTML = `
+        <div style="display:flex; align-items:center; gap:24px;">
+          <div style="width:140px; height:140px; border-radius:50%; background:conic-gradient(${stops}); flex-shrink:0;"></div>
+          <div style="flex:1;">${legendHTML}</div>
+        </div>
+      `;
+    }
+
+    bodyHTML = `
+      <div class="card">
+        <div style="font-weight:700; font-size:14px; margin-bottom:14px;">みんなの正解率 TOP10</div>
+        ${avgHTML}
+        ${list.length ? `<table class="board"><thead><tr><th></th><th>名前</th><th style="text-align:right;">正解率</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="center-note">まだ回答がありません</div>`}
+      </div>
+      <div class="card">
+        <div style="font-weight:700; font-size:14px; margin-bottom:14px;">正解率の分布</div>
+        ${distHTML}
+      </div>
+    `;
+  }
+
+  app.innerHTML = `
+    <span class="eyebrow">SUPERVISOR</span>
+    <h1 class="title display">管理ページ</h1>
+    <p class="lede">現在のランキングと正解率の分布を表示します。</p>
+    <div class="refresh-row">
+      <button class="refresh-btn" onclick="loadData()">今すぐ更新</button>
+      <span class="updated-at">${state.updatedAt ? "最終更新: " + state.updatedAt : ""}</span>
+    </div>
+    ${bodyHTML}
+  `;
+}
+
+function loadData(){
+  state.loading = true; state.error = false; render();
+  fetch(SHEET_CSV_URL)
+    .then(r => r.text())
+    .then(csv => {
+      const lines = csv.trim().split("\n").slice(1);
+      const entries = lines.map(line => {
+        const cols = line.split(",").map(c => c.replace(/^"|"$/g,"").trim());
+        return { name: cols[1], score: Number(cols[2]), total: Number(cols[3]) };
+      }).filter(e => e.name && !isNaN(e.score) && e.total);
+      entries.sort((a,b) => (b.score/b.total) - (a.score/a.total));
+      state.entries = entries;
+      const now = new Date();
+      state.updatedAt = now.getHours().toString().padStart(2,"0") + ":" + now.getMinutes().toString().padStart(2,"0") + ":" + now.getSeconds().toString().padStart(2,"0");
+    })
+    .catch(() => { state.error = true; })
+    .finally(() => { state.loading = false; render(); });
+}
+
+render();
+loadData();
+if(AUTO_REFRESH_SEC > 0){
+  setInterval(loadData, AUTO_REFRESH_SEC * 1000);
+}
+window.scrollTo(0,0);
+</script>
+</body>
+</html>
