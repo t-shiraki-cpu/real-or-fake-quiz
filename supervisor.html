@@ -118,7 +118,7 @@ function render(){
         <div style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:8px;">
           <span style="width:11px; height:11px; border-radius:50%; background:${b.color}; display:inline-block; flex-shrink:0;"></span>
           <span style="color:var(--text);">${b.label}</span>
-          <span style="color:var(--muted); margin-left:auto;">${b.count}人</span>
+          <span style="color:var(--muted); margin-left:auto;">${b.count}人 (${Math.round(b.count/list.length*100)}%)</span>
         </div>
       `).join("");
       distHTML = `
