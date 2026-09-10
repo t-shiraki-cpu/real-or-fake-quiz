@@ -276,7 +276,10 @@ function resultHTML(){
     }
     boardHTML = `
       <div class="card">
-        <div style="font-weight:700; font-size:13.5px; margin-bottom:10px;">みんなの正解率 TOP10</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div style="font-weight:700; font-size:13.5px;">みんなの正解率 TOP10</div>
+          <button onclick="loadLeaderboard()" style="background:var(--surface-alt); border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-family:'Noto Sans JP', sans-serif; font-size:11.5px; font-weight:700; color:var(--text); cursor:pointer;">更新</button>
+        </div>
         ${avgHTML}
         <table class="board"><thead><tr><th></th><th>名前</th><th style="text-align:right;">正解率</th></tr></thead><tbody>${rows}</tbody></table>
       </div>
